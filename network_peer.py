@@ -34,8 +34,15 @@ DOWNLOAD_DIR = Path(__file__).resolve().parent / "downloads"
 ## ====================GUI IMPLEMENT======================##
 
 
+def run_on_ui(callback):
+    if "app" in globals() and threading.current_thread() is not threading.main_thread():
+        app.after(0, callback)
+    else:
+        callback()
+
+
 def display_noti(title, content):
-    tkinter.messagebox.showinfo(title, content)
+    run_on_ui(lambda: tkinter.messagebox.showinfo(title, content))
 
 
 class tkinterApp(tk.Tk):
@@ -492,8 +499,7 @@ class PrivateChatPage(tk.Frame):
  
         app.chatroom_textCons.config(state=tk.DISABLED)
     
-        # Display until closed manually
-        chatroom.mainloop()
+        # The application already owns the Tk event loop.
     
     # function to send public messages
     def sendPublicChatButton(self, msg):
@@ -643,14 +649,14 @@ class ChatPage(tk.Frame):
             self.friend_name_frame.append(friend_name)
 
     def update_online_user_list(self):
-        # request getting online user list
-        network_peer.send_listpeer()
-        time.sleep(0.1)
-        
+        # Clear stale entries while the asynchronous server request is pending.
         for j in range(0, len(self.user_name_frame)):
             self.user_name_frame[j].config(text="Load to see...")
             self.user_name_frame[j].config(command=None)
-        
+
+        network_peer.send_listpeer()
+
+    def render_online_user_list(self):
         if len(network_peer.onlinelist) > 0:
             i = 0
             for online_user in network_peer.onlinelist:
@@ -837,12 +843,31 @@ class NetworkPeer(Base):
     def get_online_users(self, msgdata):
         """ Processing received message from server:
             Output username of all peers that have been registered on the server and are online."""
+        online_users = msgdata.get("online_user_list")
+        if not isinstance(online_users, dict):
+            return
+
+        connectable_peer = {}
+        for key, value in online_users.items():
+            if (
+                not isinstance(key, str)
+                or not isinstance(value, (list, tuple))
+                or len(value) != 2
+                or not isinstance(value[0], str)
+                or not isinstance(value[1], int)
+                or not 1 <= value[1] <= MAX_PORT
+            ):
+                continue
+            connectable_peer[key] = tuple(value)
+
         self.connectable_peer.clear()
-        for key, value in msgdata['online_user_list'].items():
+        for key, value in connectable_peer.items():
             self.connectable_peer[key] = tuple(value)
         if self.name in self.connectable_peer:
             self.connectable_peer.pop(self.name)
         self.onlinelist = [key for key, value in self.connectable_peer.items()]
+        if "app" in globals():
+            app.after(0, app.frames[ChatPage].render_online_user_list)
     ## ===========================================================##
 
     ## ==========implement protocol for chat request (can upgrade to friend request)==========##
@@ -868,8 +893,15 @@ class NetworkPeer(Base):
 
     def chat_request(self, msgdata, address):
         """ Processing received chat request message from peer. """
-        peername = msgdata['peername']
-        host, port = msgdata['host'], msgdata['port']
+        peername = msgdata.get('peername')
+        host, port = msgdata.get('host'), msgdata.get('port')
+        if (
+            not isinstance(peername, str)
+            or not isinstance(host, str)
+            or not isinstance(port, int)
+            or not 1 <= port <= MAX_PORT
+        ):
+            return
         if address is None or address[0] != host or self.connectable_peer.get(peername) != (host, port):
             return
         msg_box = tk.messagebox.askquestion('Chat Request', 'Do you want to accept {} - {}:{}?'.format(peername, host, port),
@@ -895,9 +927,16 @@ class NetworkPeer(Base):
     def chat_accept(self, msgdata, address):
         """ Processing received accept chat request message from peer.
             Add the peer to collection of friends. """
-        peername = msgdata['peername']
-        host = msgdata['host']
-        port = msgdata['port']
+        peername = msgdata.get('peername')
+        host = msgdata.get('host')
+        port = msgdata.get('port')
+        if (
+            not isinstance(peername, str)
+            or not isinstance(host, str)
+            or not isinstance(port, int)
+            or not 1 <= port <= MAX_PORT
+        ):
+            return
         if address is None or address[0] != host or self.connectable_peer.get(peername) != (host, port):
             return
         display_noti("Chat Request Result",
@@ -935,12 +974,24 @@ class NetworkPeer(Base):
         """ Processing received public chat message from central server."""
         if address is None or address[0] != self.server_info[0]:
             return
-        # insert messages to text box
-        message = msgdata['name'] + ": " + msgdata['message']
-        app.chatroom_textCons.config(state=tk.NORMAL)
-        app.chatroom_textCons.insert(tk.END, message+"\n\n")
-        app.chatroom_textCons.config(state=tk.DISABLED)
-        app.chatroom_textCons.see(tk.END)
+        name = msgdata.get('name')
+        message = msgdata.get('message')
+        if (
+            not isinstance(name, str)
+            or not isinstance(message, str)
+            or len(name) > 32
+            or len(message) > 4096
+        ):
+            return
+        message = name + ": " + message
+
+        def append_message():
+            app.chatroom_textCons.config(state=tk.NORMAL)
+            app.chatroom_textCons.insert(tk.END, message + "\n\n")
+            app.chatroom_textCons.config(state=tk.DISABLED)
+            app.chatroom_textCons.see(tk.END)
+
+        run_on_ui(append_message)
     ## ===========================================================##
 
     ## ==========implement protocol for text messaging==========##
@@ -959,19 +1010,27 @@ class NetworkPeer(Base):
 
     def recv_message(self, msgdata, address):
         """ Processing received chat message from peer."""
-        friend_name = msgdata['friend_name']
+        friend_name = msgdata.get('friend_name')
+        message_text = msgdata.get('message')
+        if (
+            not isinstance(friend_name, str)
+            or not isinstance(message_text, str)
+            or len(friend_name) > 32
+            or len(message_text) > 4096
+        ):
+            return
         friend = self.friendlist.get(friend_name)
         if friend is not None and address is not None and address[0] == friend[0]:
-            # insert messages to text box
-            message = friend_name + ": " + msgdata['message']
-            app.frames[ChatPage].frame_list[friend_name].message_area.config(
-                state=tk.NORMAL)
-            app.frames[ChatPage].frame_list[friend_name].message_area.insert(
-                tk.END, message+"\n\n")
-            app.frames[ChatPage].frame_list[friend_name].message_area.config(
-                state=tk.DISABLED)
-            app.frames[ChatPage].frame_list[friend_name].message_area.see(
-                tk.END)
+            message = friend_name + ": " + message_text
+
+            def append_message():
+                message_area = app.frames[ChatPage].frame_list[friend_name].message_area
+                message_area.config(state=tk.NORMAL)
+                message_area.insert(tk.END, message + "\n\n")
+                message_area.config(state=tk.DISABLED)
+                message_area.see(tk.END)
+
+            run_on_ui(append_message)
     ## ===========================================================##
 
     ## ==========implement protocol for file tranfering==========##

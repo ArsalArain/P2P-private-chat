@@ -12,6 +12,7 @@ from hash_function import (
     PASSWORD_ITERATIONS,
     build_login_proof,
     constant_time_equal,
+    is_password_hash,
     password_key_from_hash,
     parse_password_hash,
 )
