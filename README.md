@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/images/banner.png" alt="P2P Private Chat" width="100%"></p>
+![alt text](image-4.png)
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
@@ -36,7 +36,7 @@ A desktop chat application written in Python. A **central server** handles regis
 
 ## How it works
 
-<p align="center"><img src="docs/images/architecture.png" alt="How the central server and peers work together" width="90%"></p>
+![alt text](image-3.png)
 
 | Part | File | Role |
 |---|---|---|
@@ -67,7 +67,7 @@ python -m pip install -r requirements.txt
 
 ## How to run
 
-<p align="center"><img src="docs/images/flow.png" alt="Steps to run the project" width="100%"></p>
+![alt text](image-2.png)
 
 > **Always start the central server first.** The app cannot register or log in until the server is running.
 
@@ -199,7 +199,7 @@ p2p-private-chat/
 ├── docs/images/         # README graphics (banner, diagrams)
 ├── requirements.txt
 └── README.md
-```
+```git 
 
 ## Security notes
 
