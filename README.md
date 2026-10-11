@@ -1,4 +1,4 @@
-![alt text](image-4.png)
+![P2P Private Chat banner](image/banner.png)
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
@@ -36,7 +36,7 @@ A desktop chat application written in Python. A **central server** handles regis
 
 ## How it works
 
-![alt text](image-3.png)
+![P2P Private Chat architecture](image/architecture.png)
 
 | Part | File | Role |
 |---|---|---|
@@ -67,7 +67,7 @@ python -m pip install -r requirements.txt
 
 ## How to run
 
-![alt text](image-2.png)
+![How to run P2P Private Chat](image/run-guide.png)
 
 > **Always start the central server first.** The app cannot register or log in until the server is running.
 
