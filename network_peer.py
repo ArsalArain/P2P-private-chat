@@ -229,8 +229,6 @@ class RegisterPage(tk.Frame):
 
         network_peer.name = username
         network_peer.password = password
-        self.username_entry.delete(0, tk.END)
-        self.password_entry.delete(0, tk.END)
         network_peer.send_register()
 
     def toggle_password(self):
@@ -747,14 +745,26 @@ class NetworkPeer(Base):
 
     def register_success(self, msgdata):
         """ Processing received message from server: Successful registration on the server. """
+        def clear_registration_form():
+            app.frames[RegisterPage].username_entry.delete(0, tk.END)
+            app.frames[RegisterPage].password_entry.delete(0, tk.END)
+        run_on_ui(clear_registration_form)
         display_noti('Register Noti', 'Register Successful.')
         print('Register Successful.')
 
     def register_error(self, msgdata):
         """ Processing received message from server: Registration failed on the server. """
-        display_noti('Register Noti',
-                     'Register Error. Username existed or null!')
-        print('Register Error. Username existed. Login!')
+        reason = msgdata.get("reason")
+        details = {
+            "invalid_input": "The server rejected the username, port, or password verifier.",
+            "username_exists": "That username already exists. Choose another username.",
+            "registration_unavailable": "Registration is temporarily unavailable.",
+        }
+        display_noti(
+            "Register Error",
+            details.get(reason, "The server rejected the registration request."),
+        )
+        print("Register Error:", reason)
     ## ===========================================================##
 
     ## ==========implement protocol for authentication (log in) - network peer==========##
